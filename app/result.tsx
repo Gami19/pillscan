@@ -14,16 +14,34 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VisionAPIClient, PillRecognizer, RecognitionResult } from '@/lib/vision-api';
 import { supabase } from '@/lib/supabase';
+import { SpeechButton } from '@/components/SpeechButton';  // 追加
+import { PillSpeech } from '@/lib/speech';  // 追加
 
 export default function ResultScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const [analyzing, setAnalyzing] = useState(true);
   const [result, setResult] = useState<RecognitionResult | null>(null);
+  const [speechText, setSpeechText] = useState<string>('');  // 追加
 
+  // 既存のuseEffectを拡張
   useEffect(() => {
+    // 画像解析実行
     analyzeImage();
   }, []);
 
+  // 解析結果が変更されたときの音声テキスト準備（新規追加）
+  useEffect(() => {
+    if (result && !analyzing) {
+      console.log('🎵 音声テキスト準備中...');
+      const greeting = PillSpeech.getTimeBasedGreeting();
+      const pillInfo = PillSpeech.formatPillInfoForSpeech(result);
+      const fullSpeechText = greeting + pillInfo;
+      setSpeechText(fullSpeechText);
+      console.log('✅ 音声テキスト準備完了');
+    }
+  }, [result, analyzing]);  // result と analyzing の変更を監視
+
+  // 既存の analyzeImage 関数はそのまま
   const analyzeImage = async () => {
     try {
       setAnalyzing(true);
@@ -32,7 +50,6 @@ export default function ResultScreen() {
         throw new Error('画像が選択されていません');
       }
 
-      // Google Vision API キーの確認
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY;
       if (!apiKey) {
         throw new Error('Vision API キーが設定されていません');
@@ -40,23 +57,14 @@ export default function ResultScreen() {
 
       console.log('🚀 AI解析開始');
 
-      // Google Vision API クライアント初期化
       const visionClient = new VisionAPIClient(apiKey);
-      
-      // 画像解析実行
       const visionResult = await visionClient.analyzeImage(imageUri);
-      
-      // 薬剤情報抽出
       const extractedInfo = PillRecognizer.extractPillInfo(visionResult);
-      
-      // データベースとの照合
       const matchedPill = await PillRecognizer.matchWithDatabase(extractedInfo, supabase);
       
-      // 結果をマージ
       const finalResult: RecognitionResult = {
         ...extractedInfo,
         matchedPill,
-        // データベースの情報で補完
         pillName: matchedPill?.name || extractedInfo.pillName,
         manufacturer: matchedPill?.manufacturer || extractedInfo.manufacturer,
         dosage: matchedPill?.dosage || extractedInfo.dosage,
@@ -69,7 +77,6 @@ export default function ResultScreen() {
       console.error('❌ AI解析エラー:', error);
       Alert.alert('エラー', `AI解析に失敗しました: ${error.message}`);
       
-      // フォールバック: ダミーデータ表示
       const fallbackResult: RecognitionResult = {
         pillName: '認識できませんでした',
         confidence: 0.1,
@@ -82,6 +89,7 @@ export default function ResultScreen() {
     }
   };
 
+  // 既存の handleConfirm, handleRetake 関数はそのまま
   const handleConfirm = () => {
     Alert.alert(
       '服薬記録',
@@ -91,7 +99,6 @@ export default function ResultScreen() {
         {
           text: '保存',
           onPress: () => {
-            // 次のステップで実装: データベースに保存
             Alert.alert('保存完了', '服薬記録を保存しました', [
               { text: 'OK', onPress: () => router.push('/') }
             ]);
@@ -189,7 +196,20 @@ export default function ResultScreen() {
                 </View>
               )}
 
-              {/* デバッグ情報（開発中のみ） */}
+              {/* 🔊 音声読み上げボタン（新規追加） */}
+              {speechText && (
+                <View style={styles.speechContainer}>
+                  <SpeechButton
+                    text={speechText}
+                    style={styles.speechButton}
+                    disabled={!result.pillName}
+                    onStart={() => console.log('🎵 音声読み上げ開始')}
+                    onComplete={() => console.log('✅ 音声読み上げ完了')}
+                  />
+                </View>
+              )}
+
+              {/* デバッグ情報 */}
               {__DEV__ && result.detectedTexts && result.detectedTexts.length > 0 && (
                 <View style={styles.debugContainer}>
                   <Text style={styles.debugTitle}>🔍 デバッグ情報:</Text>
@@ -236,7 +256,9 @@ export default function ResultScreen() {
   );
 }
 
+// スタイルに音声ボタン用を追加
 const styles = StyleSheet.create({
+  // 既存のスタイル...
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
@@ -324,9 +346,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
-  pillInfo: {
-    
-  },
+  pillInfo: {},
   pillName: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -362,6 +382,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057',
     fontFamily: 'monospace',
+  },
+  // 🔊 音声ボタン用スタイル（新規追加）
+  speechContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  speechButton: {
+    minWidth: 200,
+    justifyContent: 'center',
   },
   debugContainer: {
     marginTop: 16,

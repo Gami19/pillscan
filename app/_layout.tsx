@@ -24,7 +24,7 @@ export default function RootLayout() {
 
   return (
     <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="もどる" options={{ headerShown: false }} />
       <Stack.Screen name="camera" options={{ presentation: 'modal', title: '薬剤撮影' }} />
       <Stack.Screen name="result" options={{ title: '認識結果' }} />
       <Stack.Screen name="+not-found" />
