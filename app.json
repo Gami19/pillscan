@@ -49,13 +49,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "薬剤の撮影に必要です"
+          "cameraPermission": "薬剤の撮影に必要"
         }
       ],
       [
         "expo-media-library", 
         {
-          "photosPermission": "撮影画像の保存に必要です"
+          "photosPermission": "撮影画像の保存に必要"
         }
       ]
     ],

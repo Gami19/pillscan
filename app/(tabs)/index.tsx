@@ -1,45 +1,58 @@
-// app/(tabs)/index.tsx - ホーム画面をPillScan用に変更
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+// app/(tabs)/index.tsx
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { DatabaseTest } from '@/components/DatabaseTest';
 
 export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>PillScan</Text>
-        <Text style={styles.subtitle}>スマート服薬管理</Text>
-      </View>
-
-      <View style={styles.mainContent}>
-        <View style={styles.cameraSection}>
-          <Ionicons name="camera" size={80} color="#007AFF" />
-          <Text style={styles.cameraText}>薬剤パッケージを撮影</Text>
-          
-          <Link href="/camera" asChild>
-            <TouchableOpacity style={styles.cameraButton}>
-              <Text style={styles.buttonText}>撮影開始</Text>
-            </TouchableOpacity>
-          </Link>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* ヘッダーセクション */}
+        <View style={styles.header}>
+          <Text style={styles.title}>PillScan</Text>
+          <Text style={styles.subtitle}>スマート服薬管理</Text>
         </View>
 
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>クイックアクション</Text>
-          
-          <View style={styles.actionGrid}>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="time" size={24} color="#28A745" />
-              <Text style={styles.actionText}>服薬履歴</Text>
-            </TouchableOpacity>
+        {/* メインコンテンツ */}
+        <View style={styles.mainContent}>
+          {/* カメラセクション */}
+          <View style={styles.cameraSection}>
+            <Ionicons name="camera" size={80} color="#007AFF" />
+            <Text style={styles.cameraText}>薬剤パッケージを撮影</Text>
             
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="settings" size={24} color="#6C757D" />
-              <Text style={styles.actionText}>設定</Text>
-            </TouchableOpacity>
+            <Link href="/camera" asChild>
+              <TouchableOpacity style={styles.cameraButton}>
+                <Text style={styles.buttonText}>撮影開始</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+
+          {/* クイックアクション */}
+          <View style={styles.quickActions}>
+            <Text style={styles.sectionTitle}>クイックアクション</Text>
+            
+            <View style={styles.actionGrid}>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="time" size={24} color="#28A745" />
+                <Text style={styles.actionText}>服薬履歴</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="settings" size={24} color="#6C757D" />
+                <Text style={styles.actionText}>設定</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+
+        {/* 🔧 開発者テストセクション（ここが重要！） */}
+        <View style={styles.debugSection}>
+          <Text style={styles.debugTitle}>🔧 開発者テスト</Text>
+          <DatabaseTest />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -67,7 +80,6 @@ const styles = StyleSheet.create({
     color: '#6C757D',
   },
   mainContent: {
-    flex: 1,
     padding: 20,
   },
   cameraSection: {
@@ -100,7 +112,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickActions: {
-    flex: 1,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
@@ -128,5 +140,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: '#495057',
+  },
+  // 🔧 開発者テストセクションのスタイル
+  debugSection: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#FFF3CD',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFEAA7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  debugTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });
