@@ -7,6 +7,7 @@ import { DatabaseTest } from '@/components/DatabaseTest';
 
 export default function HomeScreen() {
   return (
+    
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ヘッダーセクション */}

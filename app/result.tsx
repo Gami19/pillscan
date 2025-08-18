@@ -12,14 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-interface RecognitionResult {
-  pillName?: string;
-  manufacturer?: string;
-  dosage?: string;
-  confidence: number;
-  rawText: string;
-}
+import { VisionAPIClient, PillRecognizer, RecognitionResult } from '@/lib/vision-api';
+import { supabase } from '@/lib/supabase';
 
 export default function ResultScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
@@ -27,7 +21,6 @@ export default function ResultScreen() {
   const [result, setResult] = useState<RecognitionResult | null>(null);
 
   useEffect(() => {
-    // AI解析のシミュレーション（次のステップで実装）
     analyzeImage();
   }, []);
 
@@ -35,21 +28,55 @@ export default function ResultScreen() {
     try {
       setAnalyzing(true);
       
-      // シミュレーション: 3秒後にダミーデータを表示
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (!imageUri) {
+        throw new Error('画像が選択されていません');
+      }
+
+      // Google Vision API キーの確認
+      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY;
+      if (!apiKey) {
+        throw new Error('Vision API キーが設定されていません');
+      }
+
+      console.log('🚀 AI解析開始');
+
+      // Google Vision API クライアント初期化
+      const visionClient = new VisionAPIClient(apiKey);
       
-      // ダミー認識結果
-      const mockResult: RecognitionResult = {
-        pillName: 'ロキソニン錠60mg',
-        manufacturer: '第一三共',
-        dosage: '60mg',
-        confidence: 0.92,
-        rawText: 'ロキソニン錠60mg 第一三共 解熱鎮痛消炎剤'
+      // 画像解析実行
+      const visionResult = await visionClient.analyzeImage(imageUri);
+      
+      // 薬剤情報抽出
+      const extractedInfo = PillRecognizer.extractPillInfo(visionResult);
+      
+      // データベースとの照合
+      const matchedPill = await PillRecognizer.matchWithDatabase(extractedInfo, supabase);
+      
+      // 結果をマージ
+      const finalResult: RecognitionResult = {
+        ...extractedInfo,
+        matchedPill,
+        // データベースの情報で補完
+        pillName: matchedPill?.name || extractedInfo.pillName,
+        manufacturer: matchedPill?.manufacturer || extractedInfo.manufacturer,
+        dosage: matchedPill?.dosage || extractedInfo.dosage,
       };
       
-      setResult(mockResult);
-    } catch (error) {
-      Alert.alert('エラー', 'AI解析に失敗しました');
+      console.log('✅ AI解析完了:', finalResult);
+      setResult(finalResult);
+      
+    } catch (error: any) {
+      console.error('❌ AI解析エラー:', error);
+      Alert.alert('エラー', `AI解析に失敗しました: ${error.message}`);
+      
+      // フォールバック: ダミーデータ表示
+      const fallbackResult: RecognitionResult = {
+        pillName: '認識できませんでした',
+        confidence: 0.1,
+        rawText: '画像からテキストを認識できませんでした',
+        detectedTexts: [],
+      };
+      setResult(fallbackResult);
     } finally {
       setAnalyzing(false);
     }
@@ -119,35 +146,66 @@ export default function ResultScreen() {
                 <View 
                   style={[
                     styles.confidenceFill,
-                    { width: `${result.confidence * 100}%` }
+                    { 
+                      width: `${result.confidence * 100}%`,
+                      backgroundColor: result.confidence > 0.7 ? '#28A745' : result.confidence > 0.4 ? '#FFC107' : '#DC3545'
+                    }
                   ]} 
                 />
               </View>
             </View>
 
             <View style={styles.pillInfo}>
-              <Text style={styles.pillName}>{result.pillName}</Text>
+              <Text style={styles.pillName}>
+                {result.pillName || '薬剤名を認識できませんでした'}
+              </Text>
               
-              <View style={styles.pillDetails}>
-                <View style={styles.pillDetailItem}>
-                  <Ionicons name="business" size={16} color="#6C757D" />
-                  <Text style={styles.pillDetailText}>
-                    製造元: {result.manufacturer}
-                  </Text>
+              {(result.manufacturer || result.dosage) && (
+                <View style={styles.pillDetails}>
+                  {result.manufacturer && (
+                    <View style={styles.pillDetailItem}>
+                      <Ionicons name="business" size={16} color="#6C757D" />
+                      <Text style={styles.pillDetailText}>
+                        製造元: {result.manufacturer}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {result.dosage && (
+                    <View style={styles.pillDetailItem}>
+                      <Ionicons name="medical" size={16} color="#6C757D" />
+                      <Text style={styles.pillDetailText}>
+                        用量: {result.dosage}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                
-                <View style={styles.pillDetailItem}>
-                  <Ionicons name="medical" size={16} color="#6C757D" />
-                  <Text style={styles.pillDetailText}>
-                    用量: {result.dosage}
-                  </Text>
-                </View>
-              </View>
+              )}
 
-              <View style={styles.rawTextContainer}>
-                <Text style={styles.rawTextLabel}>認識テキスト:</Text>
-                <Text style={styles.rawText}>{result.rawText}</Text>
-              </View>
+              {result.rawText && (
+                <View style={styles.rawTextContainer}>
+                  <Text style={styles.rawTextLabel}>認識テキスト:</Text>
+                  <Text style={styles.rawText}>{result.rawText}</Text>
+                </View>
+              )}
+
+              {/* デバッグ情報（開発中のみ） */}
+              {__DEV__ && result.detectedTexts && result.detectedTexts.length > 0 && (
+                <View style={styles.debugContainer}>
+                  <Text style={styles.debugTitle}>🔍 デバッグ情報:</Text>
+                  <Text style={styles.debugText}>
+                    認識テキスト数: {result.detectedTexts.length}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    主要テキスト: {result.detectedTexts.slice(0, 5).join(', ')}
+                  </Text>
+                  {result.matchedPill && (
+                    <Text style={styles.debugText}>
+                      DB照合: ✅ {result.matchedPill.name}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -167,6 +225,7 @@ export default function ResultScreen() {
           <TouchableOpacity 
             style={[styles.button, styles.confirmButton]}
             onPress={handleConfirm}
+            disabled={!result?.pillName}
           >
             <Ionicons name="checkmark" size={20} color="#FFFFFF" />
             <Text style={styles.confirmButtonText}>記録する</Text>
@@ -263,7 +322,6 @@ const styles = StyleSheet.create({
   },
   confidenceFill: {
     height: '100%',
-    backgroundColor: '#28A745',
     borderRadius: 3,
   },
   pillInfo: {
@@ -292,6 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     padding: 12,
     borderRadius: 8,
+    marginBottom: 12,
   },
   rawTextLabel: {
     fontSize: 12,
@@ -303,6 +362,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057',
     fontFamily: 'monospace',
+  },
+  debugContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F1F3F4',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  debugTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FF9500',
+    marginBottom: 4,
+  },
+  debugText: {
+    fontSize: 11,
+    color: '#6C757D',
+    fontFamily: 'monospace',
+    marginVertical: 1,
   },
   buttonContainer: {
     flexDirection: 'row',
