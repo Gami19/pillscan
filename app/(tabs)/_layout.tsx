@@ -20,9 +20,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="two"
         options={{
-          title: '履歴',  // ← 変更
+          title: '履歴',
           tabBarIcon: ({ color }) => (
             <Ionicons name="time" size={24} color={color} />
           ),
