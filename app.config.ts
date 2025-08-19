@@ -1,0 +1,72 @@
+import { ConfigContext, ExpoConfig }from '@expo/config';
+import 'dotenv/config';
+
+export default ({ config }: ConfigContext): ExpoConfig => {
+  return {
+    ...config,
+    name: "pillscan",
+    slug: "pillscan",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "pillscan",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/images/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    assetBundlePatterns: [
+        "**/*"
+    ],
+    ios:{
+        supportsTablet: true,
+        bundleIdentifier: "com.teamcocoro.pillscan",
+        infoPlist: {
+          NSCameraUsageDescription: "薬剤パッケージの撮影に使用",
+          NSMicrophoneUsageDescription: "音声読み上げ機能で使用",
+          NSPhotoLibraryUsageDescription: "撮影した画像を保存"
+        }
+    },
+    android:{
+        adaptiveIcon: {
+            foregroundImage: "./assets/images/adaptive-icon.png",
+            backgroundColor: "#ffffff"
+        },
+        edgeToEdgeEnabled: true,
+        package: "com.teamcocoro.pillscan",
+        permissions: [
+            "android.permission.CAMERA",
+            "android.permission.RECORD_AUDIO",
+            "android.permission.READ_EXTERNAL_STORAGE",
+            "android.permission.WRITE_EXTERNAL_STORAGE"
+        ]
+    },
+    plugins:[
+        "expo-router",
+        [
+            "expo-camera",
+            {
+                cameraPermission: "薬剤の撮影に必要"
+            }
+        ],
+        [
+            "expo-media-library", 
+            {
+                photosPermission: "撮影画像の保存に必要"
+            }
+        ]
+    ],
+    experiments:{
+        typedRoutes: true
+    },
+    extra: {
+      ...config.extra,
+      apiUrl: process.env.API_URL,
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      googleVisionApiKey: process.env.GOOGLE_VISION_API_KEY
+    },
+  };
+};
