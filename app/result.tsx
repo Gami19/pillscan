@@ -1,4 +1,4 @@
-// app/result.tsx
+// app/result.tsx のロキソニン専用デモ版
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -14,96 +14,181 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VisionAPIClient, PillRecognizer, RecognitionResult } from '@/lib/vision-api';
 import { supabase } from '@/lib/supabase';
-import { SpeechButton } from '@/components/SpeechButton';  // 追加
-import { PillSpeech } from '@/lib/speech';  // 追加
+import { SpeechButton } from '@/components/SpeechButton';
+import { PillSpeech } from '@/lib/speech';
+import { MedicationRecordService, MedicationRecordInput } from '@/lib/medication-record';
 
 export default function ResultScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const [analyzing, setAnalyzing] = useState(true);
   const [result, setResult] = useState<RecognitionResult | null>(null);
-  const [speechText, setSpeechText] = useState<string>('');  // 追加
+  const [speechText, setSpeechText] = useState<string>('');
+  const [saving, setSaving] = useState(false);
 
-  // 既存のuseEffectを拡張
   useEffect(() => {
-    // 画像解析実行
     analyzeImage();
   }, []);
 
-  // 解析結果が変更されたときの音声テキスト準備（新規追加）
   useEffect(() => {
     if (result && !analyzing) {
-      console.log('🎵 音声テキスト準備中...');
       const greeting = PillSpeech.getTimeBasedGreeting();
       const pillInfo = PillSpeech.formatPillInfoForSpeech(result);
-      const fullSpeechText = greeting + pillInfo;
-      setSpeechText(fullSpeechText);
-      console.log('✅ 音声テキスト準備完了');
+      setSpeechText(greeting + pillInfo);
     }
-  }, [result, analyzing]);  // result と analyzing の変更を監視
+  }, [result, analyzing]);
 
-  // 既存の analyzeImage 関数はそのまま
   const analyzeImage = async () => {
+  try {
+    setAnalyzing(true);
+    
+    if (!imageUri) {
+      throw new Error('画像が選択されていません');
+    }
+
+    console.log('🚀 AI解析開始（ロキソニン専用デモ）');
+
+    // デモ用：必ずロキソニンとして認識
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // ✅ 修正：正しいUUID形式を使用または削除
+    const demoResult: RecognitionResult = {
+      pillName: 'ロキソニン錠60mg',
+      manufacturer: '第一三共',
+      dosage: '60mg',
+      confidence: 0.95,
+      rawText: 'ロキソニン錠60mg 第一三共 解熱鎮痛消炎剤',
+      detectedTexts: ['ロキソニン錠', '60mg', '第一三共', '解熱鎮痛消炎剤'],
+      matchedPill: {
+        // id: 'demo-loxonin-id',  // ❌ 無効なUUID形式
+        id: undefined,  // ✅ 修正：undefined にする
+        name: 'ロキソニン錠60mg',
+        manufacturer: '第一三共',
+        dosage: '60mg',
+        description: '解熱鎮痛消炎剤'
+      }
+    };
+
+    console.log('✅ AI解析完了（デモ結果）:', demoResult);
+    setResult(demoResult);
+    
+  } catch (error: any) {
+    console.error('❌ AI解析エラー:', error);
+    
+    // フォールバック：エラー時でもロキソニンとして認識
+    const fallbackResult: RecognitionResult = {
+      pillName: 'ロキソニン錠60mg',
+      manufacturer: '第一三共',
+      dosage: '60mg',
+      confidence: 0.80,
+      rawText: 'デモモード：ロキソニンとして認識',
+      detectedTexts: ['ロキソニン'],
+      matchedPill: undefined  // ✅ 修正：undefined にする
+    };
+    setResult(fallbackResult);
+  } finally {
+    setAnalyzing(false);
+  }
+};
+
+  const handleConfirm = async () => {
+    // ✅ 修正：result.pillNameの存在チェックを緩くする
+    if (!result) {
+      Alert.alert('エラー', '解析結果がありません');
+      return;
+    }
+
     try {
-      setAnalyzing(true);
-      
-      if (!imageUri) {
-        throw new Error('画像が選択されていません');
-      }
+      const timePeriod = MedicationRecordService.getCurrentTimePeriod();
+      const timePeriodLabel = MedicationRecordService.getTimePeriodLabel(timePeriod);
+      const pillName = result.pillName || 'ロキソニン錠60mg'; // デフォルト値設定
 
-      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY;
-      if (!apiKey) {
-        throw new Error('Vision API キーが設定されていません');
-      }
-
-      console.log('🚀 AI解析開始');
-
-      const visionClient = new VisionAPIClient(apiKey);
-      const visionResult = await visionClient.analyzeImage(imageUri);
-      const extractedInfo = PillRecognizer.extractPillInfo(visionResult);
-      const matchedPill = await PillRecognizer.matchWithDatabase(extractedInfo, supabase);
-      
-      const finalResult: RecognitionResult = {
-        ...extractedInfo,
-        matchedPill,
-        pillName: matchedPill?.name || extractedInfo.pillName,
-        manufacturer: matchedPill?.manufacturer || extractedInfo.manufacturer,
-        dosage: matchedPill?.dosage || extractedInfo.dosage,
-      };
-      
-      console.log('✅ AI解析完了:', finalResult);
-      setResult(finalResult);
-      
-    } catch (error: any) {
-      console.error('❌ AI解析エラー:', error);
-      Alert.alert('エラー', `AI解析に失敗しました: ${error.message}`);
-      
-      const fallbackResult: RecognitionResult = {
-        pillName: '認識できませんでした',
-        confidence: 0.1,
-        rawText: '画像からテキストを認識できませんでした',
-        detectedTexts: [],
-      };
-      setResult(fallbackResult);
-    } finally {
-      setAnalyzing(false);
+      Alert.alert(
+        '服薬記録保存',
+        `以下の内容で服薬記録を保存しますか？\n\n薬剤名: ${pillName}\n時間帯: ${timePeriodLabel}`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '保存',
+            onPress: async () => {
+              await saveMedicationRecord(timePeriod);
+            }
+          },
+          {
+            text: '時間帯を変更',
+            onPress: () => {
+              showTimePeriodSelector();
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('エラー', '保存処理でエラーが発生しました');
     }
   };
 
-  // 既存の handleConfirm, handleRetake 関数はそのまま
-  const handleConfirm = () => {
+  const saveMedicationRecord = async (timePeriod: 'morning' | 'afternoon' | 'evening' | 'night') => {
+    try {
+      setSaving(true);
+      console.log('💾 服薬記録保存処理開始...');
+
+      const pillName = result?.pillName || 'ロキソニン錠60mg';
+      const recordInput: MedicationRecordInput = {
+        pillId: result?.matchedPill?.id,
+        pillName: pillName,
+        manufacturer: result?.manufacturer || '第一三共',
+        dosage: result?.dosage || '60mg',
+        imageUrl: imageUri,
+        recognizedText: result?.rawText,
+        confidenceScore: result?.confidence || 0.8,
+        timePeriod,
+      };
+
+      const saveResult = await MedicationRecordService.saveMedicationRecord(recordInput);
+
+      if (saveResult.success) {
+        Alert.alert(
+          '保存完了', 
+          `服薬記録を保存しました\n\n薬剤名: ${recordInput.pillName}\n時間帯: ${MedicationRecordService.getTimePeriodLabel(timePeriod)}`,
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                const completionMessage = `${recordInput.pillName}の服薬記録を保存しました。`;
+                PillSpeech.speak(completionMessage);
+                router.push('/');
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('保存エラー', saveResult.error || '不明なエラーが発生しました');
+      }
+
+    } catch (error: any) {
+      console.error('❌ 保存処理エラー:', error);
+      Alert.alert('エラー', `保存に失敗しました: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showTimePeriodSelector = () => {
+    const timePeriods = [
+      { key: 'morning', label: '朝' },
+      { key: 'afternoon', label: '昼' },
+      { key: 'evening', label: '夕方' },
+      { key: 'night', label: '夜' }
+    ];
+
     Alert.alert(
-      '服薬記録',
-      '服薬記録として保存しますか？',
+      '時間帯を選択',
+      'いつ服薬しましたか？',
       [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '保存',
-          onPress: () => {
-            Alert.alert('保存完了', '服薬記録を保存しました', [
-              { text: 'OK', onPress: () => router.push('/') }
-            ]);
-          }
-        }
+        ...timePeriods.map(period => ({
+          text: period.label,
+          onPress: () => saveMedicationRecord(period.key as any)
+        })),
+        { text: 'キャンセル', style: 'cancel' }
       ]
     );
   };
@@ -119,7 +204,7 @@ export default function ResultScreen() {
         <TouchableOpacity onPress={() => router.push('/')}>
           <Ionicons name="close" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.title}>AI解析結果</Text>
+        <Text style={styles.title}>AI解析結果（デモ）</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -137,7 +222,7 @@ export default function ResultScreen() {
             <Ionicons name="scan" size={60} color="#007AFF" />
             <Text style={styles.analyzingText}>AI解析中...</Text>
             <Text style={styles.analyzingSubtext}>
-              薬剤パッケージを解析しています
+              ロキソニンパッケージを解析しています（デモモード）
             </Text>
           </View>
         )}
@@ -145,6 +230,12 @@ export default function ResultScreen() {
         {/* 解析結果 */}
         {result && !analyzing && (
           <View style={styles.resultContainer}>
+            {/* デモバナー */}
+            <View style={styles.demoBanner}>
+              <Ionicons name="information-circle" size={20} color="#007AFF" />
+              <Text style={styles.demoText}>デモモード：ロキソニン専用</Text>
+            </View>
+
             <View style={styles.confidenceContainer}>
               <Text style={styles.confidenceText}>
                 認識精度: {Math.round(result.confidence * 100)}%
@@ -155,7 +246,7 @@ export default function ResultScreen() {
                     styles.confidenceFill,
                     { 
                       width: `${result.confidence * 100}%`,
-                      backgroundColor: result.confidence > 0.7 ? '#28A745' : result.confidence > 0.4 ? '#FFC107' : '#DC3545'
+                      backgroundColor: '#28A745' // 常に緑色（高精度）
                     }
                   ]} 
                 />
@@ -164,68 +255,40 @@ export default function ResultScreen() {
 
             <View style={styles.pillInfo}>
               <Text style={styles.pillName}>
-                {result.pillName || '薬剤名を認識できませんでした'}
+                {result.pillName || 'ロキソニン錠60mg'}
               </Text>
               
-              {(result.manufacturer || result.dosage) && (
-                <View style={styles.pillDetails}>
-                  {result.manufacturer && (
-                    <View style={styles.pillDetailItem}>
-                      <Ionicons name="business" size={16} color="#6C757D" />
-                      <Text style={styles.pillDetailText}>
-                        製造元: {result.manufacturer}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {result.dosage && (
-                    <View style={styles.pillDetailItem}>
-                      <Ionicons name="medical" size={16} color="#6C757D" />
-                      <Text style={styles.pillDetailText}>
-                        用量: {result.dosage}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {result.rawText && (
-                <View style={styles.rawTextContainer}>
-                  <Text style={styles.rawTextLabel}>認識テキスト:</Text>
-                  <Text style={styles.rawText}>{result.rawText}</Text>
-                </View>
-              )}
-
-              {/* 🔊 音声読み上げボタン（新規追加） */}
-              {speechText && (
-                <View style={styles.speechContainer}>
-                  <SpeechButton
-                    text={speechText}
-                    style={styles.speechButton}
-                    disabled={!result.pillName}
-                    onStart={() => console.log('🎵 音声読み上げ開始')}
-                    onComplete={() => console.log('✅ 音声読み上げ完了')}
-                  />
-                </View>
-              )}
-
-              {/* デバッグ情報 */}
-              {__DEV__ && result.detectedTexts && result.detectedTexts.length > 0 && (
-                <View style={styles.debugContainer}>
-                  <Text style={styles.debugTitle}>🔍 デバッグ情報:</Text>
-                  <Text style={styles.debugText}>
-                    認識テキスト数: {result.detectedTexts.length}
+              <View style={styles.pillDetails}>
+                <View style={styles.pillDetailItem}>
+                  <Ionicons name="business" size={16} color="#6C757D" />
+                  <Text style={styles.pillDetailText}>
+                    製造元: {result.manufacturer || '第一三共'}
                   </Text>
-                  <Text style={styles.debugText}>
-                    主要テキスト: {result.detectedTexts.slice(0, 5).join(', ')}
-                  </Text>
-                  {result.matchedPill && (
-                    <Text style={styles.debugText}>
-                      DB照合: ✅ {result.matchedPill.name}
-                    </Text>
-                  )}
                 </View>
-              )}
+                
+                <View style={styles.pillDetailItem}>
+                  <Ionicons name="medical" size={16} color="#6C757D" />
+                  <Text style={styles.pillDetailText}>
+                    用量: {result.dosage || '60mg'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.rawTextContainer}>
+                <Text style={styles.rawTextLabel}>認識テキスト:</Text>
+                <Text style={styles.rawText}>
+                  {result.rawText || 'ロキソニン錠60mg 第一三共'}
+                </Text>
+              </View>
+
+              {/* 音声読み上げボタン */}
+              <View style={styles.speechContainer}>
+                <SpeechButton
+                  text={speechText}
+                  style={styles.speechButton}
+                  disabled={false} // 常に有効
+                />
+              </View>
             </View>
           </View>
         )}
@@ -237,18 +300,30 @@ export default function ResultScreen() {
           <TouchableOpacity 
             style={[styles.button, styles.retakeButton]}
             onPress={handleRetake}
+            disabled={saving}
           >
             <Ionicons name="camera" size={20} color="#6C757D" />
             <Text style={styles.retakeButtonText}>再撮影</Text>
           </TouchableOpacity>
 
+          {/* ✅ 修正：常に有効な記録ボタン */}
           <TouchableOpacity 
-            style={[styles.button, styles.confirmButton]}
+            style={[
+              styles.button, 
+              styles.confirmButton,
+              saving && styles.confirmButtonDisabled
+            ]}
             onPress={handleConfirm}
-            disabled={!result?.pillName}
+            disabled={saving} // savingの時のみ無効
           >
-            <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-            <Text style={styles.confirmButtonText}>記録する</Text>
+            <Ionicons 
+              name={saving ? "hourglass" : "checkmark"} 
+              size={20} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.confirmButtonText}>
+              {saving ? '保存中...' : '記録する'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -256,9 +331,9 @@ export default function ResultScreen() {
   );
 }
 
-// スタイルに音声ボタン用を追加
+// スタイル（追加分のみ）
 const styles = StyleSheet.create({
-  // 既存のスタイル...
+  // 既存のスタイル...（前回と同じ）
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
@@ -327,6 +402,22 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  // ✅ 新規：デモバナーのスタイル
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  demoText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   confidenceContainer: {
     marginBottom: 20,
   },
@@ -370,7 +461,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   rawTextLabel: {
     fontSize: 12,
@@ -383,7 +474,6 @@ const styles = StyleSheet.create({
     color: '#495057',
     fontFamily: 'monospace',
   },
-  // 🔊 音声ボタン用スタイル（新規追加）
   speechContainer: {
     marginTop: 16,
     alignItems: 'center',
@@ -391,26 +481,6 @@ const styles = StyleSheet.create({
   speechButton: {
     minWidth: 200,
     justifyContent: 'center',
-  },
-  debugContainer: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#F1F3F4',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
-  },
-  debugTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FF9500',
-    marginBottom: 4,
-  },
-  debugText: {
-    fontSize: 11,
-    color: '#6C757D',
-    fontFamily: 'monospace',
-    marginVertical: 1,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -439,6 +509,9 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#007AFF',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#C7C7CC',
   },
   confirmButtonText: {
     color: '#FFFFFF',
