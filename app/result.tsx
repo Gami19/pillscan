@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VisionAPIClient, PillRecognizer, RecognitionResult } from '@/lib/vision-api';
-import { supabase } from '@/lib/supabase';
 import { SpeechButton } from '@/components/SpeechButton';
 import { PillSpeech } from '@/lib/speech';
 import { MedicationRecordService, MedicationRecordInput } from '@/lib/medication-record';

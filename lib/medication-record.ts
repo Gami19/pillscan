@@ -1,5 +1,5 @@
 // lib/medication-record.ts
-import { supabase } from './supabase';
+import { supabase } from '@/lib/supabase';
 import * as Crypto from 'expo-crypto';
 
 export interface MedicationRecordInput {

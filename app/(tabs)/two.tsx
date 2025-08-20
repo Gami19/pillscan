@@ -70,13 +70,15 @@ export default function HistoryScreen() {
   };
 
   // ✅ 修正：確実に存在するアイコン名のみ使用
-  const getTimePeriodIcon = (timePeriod: string) => {
+  const getTimePeriodIcon = (
+    timePeriod: string
+  ): keyof typeof Ionicons.glyphMap => {
     const icons = {
-      morning: 'sunny',        // 朝 - 太陽
-      afternoon: 'cloudy',     // 昼 - 雲
-      evening: 'moon',         // 夕方 - 月（修正）
-      night: 'moon'           // 夜 - 月
-    };
+      morning: 'sunny',
+      afternoon: 'cloudy',
+      evening: 'moon',
+      night: 'moon',
+    } as const;
     return icons[timePeriod as keyof typeof icons] || 'time';
   };
 
@@ -121,6 +123,7 @@ export default function HistoryScreen() {
             { backgroundColor: getTimePeriodColor(item.time_period) }
           ]}>
             <Ionicons 
+              name={getTimePeriodIcon(item.time_period)} 
               size={12} 
               color="#FFFFFF" 
             />
