@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { DatabaseTest } from '@/components/DatabaseTest';
+
 
 export default function HomeScreen() {
   return (
@@ -48,11 +48,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 🔧 開発者テストセクション（ここが重要！） */}
+        {/* 🔧 開発者テストセクション（ここが重要！）
         <View style={styles.debugSection}>
           <Text style={styles.debugTitle}>🔧 開発者テスト</Text>
           <DatabaseTest />
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );
